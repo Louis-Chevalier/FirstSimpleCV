@@ -1,8 +1,16 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.optimize import minimize
 
-def detect_circles(image, dp, minDist, param1, param2, minRadius, maxRadius):
+def detect_circles(params, image):
+    #print("Received parameters:", params)
+    #print("Number of received parameters:", len(params))
+
+    if len(params) != 6:
+        raise ValueError("Expected 6 parameters, but received {}.".format(len(params)))
+
+    dp, minDist, param1, param2, minRadius, maxRadius =map(int, list(params))
     # Feature Extraction
     width, height = 800, 600
     resized_image = cv2.resize(image, (width, height))
@@ -28,31 +36,12 @@ def detect_circles(image, dp, minDist, param1, param2, minRadius, maxRadius):
 
     return resized_image
 
-def grid_search(image):
-    # Define parameter ranges to search
-    dp_values = [1]
-    minDist_values = [50, 60, 70,75, 100, 110, 115]
-    param1_values = [30, 40, 50, 60, 70, 80, 90]
-    param2_values = [20, 30, 40, 50, 60, 70, 80, 90]
-    minRadius = 10
-    maxRadius = 400
+def objective(params, image):
+    # This function calculates the objective to be minimized (negative score)
+    result = detect_circles(params, image)
+    score = calculate_score(result)  # Define your scoring function
 
-    # Perform grid search
-    best_result = None
-    best_score = 0
-
-    for dp in dp_values:
-        for minDist in minDist_values:
-            for param1 in param1_values:
-                for param2 in param2_values:
-                    result = detect_circles(image, dp, minDist, param1, param2, minRadius, maxRadius)
-                    score = calculate_score(result)  # Define your scoring function
-
-                    if score > best_score:
-                        best_score = score
-                        best_result = result
-
-    return best_result
+    return -score  # We use negative score since Bayesian optimization minimizes
 
 def calculate_score(result):
     # Define a scoring function based on your specific needs
@@ -64,11 +53,22 @@ image = cv2.imread("resources/LandingPad.jpg")
 if image is None:
     print("Error: Image not loaded.")
 else:
-    # Perform grid search and display the best result
-    best_result = grid_search(image)
+    # Define search space for hyperparameters
+    bounds = [(1,5),(10,200),(10,100),(10,100),(5,50),(50,200)]
 
-    # Display the best result
+    #Perform Bayesian Parameters
+    result = minimize(objective, [2,100,50,30,10,100], args=(image,), bounds=bounds, method ='L-BFGS-B')
+
+
+    # Get the best hyperparameters
+    #print("Optimization Results:")
+    #print(result)
+    #print("Best Hyperparameters:", result.x)
+    #print("Best Objective Value (negative score):", -result.fun)
+
+
+    # Display the best result using the best hyperparameters
+    best_result = detect_circles(result.x, image)
     plt.imshow(cv2.cvtColor(best_result, cv2.COLOR_BGR2RGB))
     plt.show()
-                
-
+               
